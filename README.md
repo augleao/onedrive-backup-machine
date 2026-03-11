@@ -1,6 +1,7 @@
-OneDrive Backup Add-on for Home Assistant
 
-Minimal scaffold for a Home Assistant OS add-on that uploads backups to OneDrive.
+Onedrive Backup Machine
+
+Minimal scaffold for a Home Assistant OS add-on that downloads backups from OneDrive to local disk.
 
 Files of interest:
 - [config.json](config.json)

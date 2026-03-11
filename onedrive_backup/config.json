@@ -5,7 +5,7 @@
   "description": "Backup Home Assistant OS to OneDrive with scheduled and on-demand backups.",
   "startup": "services",
   "boot": "auto",
-  "arch": ["amd64", "armv7", "arm64", "aarch64"],
+  "arch": ["amd64", "armv7", "aarch64"],
   "host_network": true,
   "ports": {"8080/tcp": 8080},
   "map": ["config:rw", "backup:rw"],

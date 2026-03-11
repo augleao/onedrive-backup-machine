@@ -1,0 +1,24 @@
+{
+  "name": "OneDrive Backup",
+  "version": "0.1",
+  "slug": "onedrive_backup",
+  "description": "Backup Home Assistant OS to OneDrive with scheduled and on-demand backups.",
+  "startup": "services",
+  "boot": "auto",
+  "arch": ["amd64", "armv7", "arm64", "aarch64"],
+  "host_network": true,
+  "ports": {"8080/tcp": 8080},
+  "map": ["config:rw", "backup:rw"],
+  "options": {
+    "client_id": "",
+    "client_secret": "",
+    "tenant_id": "",
+    "backup_path": "/backup"
+  },
+  "schema": {
+    "client_id": "str?",
+    "client_secret": "str?",
+    "tenant_id": "str?",
+    "backup_path": "str?"
+  }
+}

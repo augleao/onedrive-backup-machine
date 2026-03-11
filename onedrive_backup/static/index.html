@@ -7,7 +7,12 @@
   <body>
     <h1>Onedrive Backup Machine</h1>
     <div id="status">Checking...</div>
-    <button id="login">Login to OneDrive</button>
+    <button id="login">Vincular conta OneDrive</button>
+    <div id="authbox" style="display:none; margin-top: 12px; padding: 10px; border: 1px solid #ccc;">
+      <div><strong>Abra esta URL:</strong> <a id="auth_url" href="#" target="_blank" rel="noopener noreferrer">-</a></div>
+      <div><strong>Informe este codigo:</strong> <code id="auth_code">-</code></div>
+      <div id="auth_message" style="margin-top: 8px;"></div>
+    </div>
     <button id="backup">Trigger Backup</button>
     <script src="/static/app.js"></script>
   </body>

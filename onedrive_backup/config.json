@@ -1,6 +1,6 @@
 {
   "name": "Onedrive Backup Machine",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "slug": "onedrive_backup_machine",
   "description": "Backup Home Assistant OS to OneDrive with scheduled and on-demand backups.",
   "startup": "services",

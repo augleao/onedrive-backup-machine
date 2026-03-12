@@ -116,6 +116,14 @@
         background: #fbfdf9;
       }
 
+      .setup-help {
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #f7fbf4;
+      }
+
       table {
         width: 100%;
         border-collapse: collapse;
@@ -322,6 +330,11 @@
         <div class="row">
           <button id="login" class="primary">Link OneDrive Account</button>
           <button id="logout">Disconnect</button>
+          <a id="azure_portal_btn" class="cta" href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Open Azure App Registrations</a>
+          <a id="azure_docs_btn" href="https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app" target="_blank" rel="noopener noreferrer">How to create app</a>
+        </div>
+        <div id="client_id_help" class="setup-help small muted" style="display: none;">
+          `client_id` is not configured in the add-on options yet. Open Azure, copy your app GUID, paste it into add-on Configuration, save, and restart.
         </div>
         <div id="authbox">
           <div><strong>Open this URL:</strong> <a id="auth_url" href="#" target="_blank" rel="noopener noreferrer">-</a></div>

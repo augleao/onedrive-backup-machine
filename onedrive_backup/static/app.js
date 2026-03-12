@@ -32,6 +32,10 @@ function setStatus(text) {
   qs('status').innerText = text;
 }
 
+function setLoginEnabled(enabled) {
+  qs('login').disabled = !enabled;
+}
+
 function formatDate(value) {
   if (!value) {
     return '-';
@@ -231,10 +235,17 @@ async function loadStatus() {
     const j = await readJsonOrThrow(r);
     if (!j.client_id_configured) {
       setStatus('Set client_id in add-on configuration');
+      setLoginEnabled(false);
+      qs('client_id_help').style.display = 'block';
+      qs('authbox').style.display = 'block';
+      qs('auth_message').innerText = 'Configure client_id first. Use the Azure button above.';
       return;
     }
+    setLoginEnabled(true);
+    qs('client_id_help').style.display = 'none';
     setStatus(j.authenticated ? 'Account linked' : 'Account not linked');
   } catch (e) {
+    setLoginEnabled(false);
     setStatus(`Error: ${e.message}`);
   }
 }
@@ -274,6 +285,12 @@ async function authStatusPoll() {
 }
 
 async function startLogin() {
+  if (qs('login').disabled) {
+    qs('authbox').style.display = 'block';
+    qs('auth_message').innerText = 'Configure client_id in add-on settings before linking account.';
+    return;
+  }
+
   let j;
   try {
     const r = await fetch('api/auth/device/start', { method: 'POST' });

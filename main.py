@@ -16,7 +16,7 @@ TENANT_ID = os.environ.get("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}" if TENANT_ID else "https://login.microsoftonline.com/common"
 # Use delegated scopes for sign-in + files access; MSAL will manage refresh tokens in the cache
 # Do not include reserved OIDC scopes (openid/profile/offline_access) in MSAL request.
-SCOPES = ["Files.ReadWrite"]
+SCOPES = ["Files.Read"]
 
 TOKEN_CACHE_PATH = os.environ.get('TOKEN_CACHE_PATH', 'token_cache.bin')
 BACKUP_PATH = os.environ.get('BACKUP_PATH', '/backup')

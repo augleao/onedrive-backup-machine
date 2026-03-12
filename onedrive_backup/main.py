@@ -485,7 +485,23 @@ async def onedrive_tree(request):
         return web.json_response({'error': 'not_authenticated'}, status=401)
 
     parent_id = request.query.get('parent_id')
-    items = await one_drive.list_children(token.get('access_token'), parent_id=parent_id)
+    try:
+        items = await one_drive.list_children(token.get('access_token'), parent_id=parent_id)
+    except Exception as ex:
+        msg = str(ex)
+        if 'SPO license' in msg or 'Tenant does not have a SPO license' in msg:
+            return web.json_response(
+                {
+                    'error': 'onedrive_license_missing',
+                    'message': (
+                        'The signed-in account does not have an active OneDrive/SharePoint license in this tenant. '
+                        'Assign a OneDrive license to this user, or clear tenant_id in add-on configuration and relink with a personal Microsoft account.'
+                    ),
+                },
+                status=400,
+            )
+        raise
+
     out = []
     for item in items:
         parent_path = _normalize_graph_parent_path((item.get('parentReference') or {}).get('path'))

@@ -10,11 +10,20 @@ from zoneinfo import ZoneInfo
 from aiohttp import web
 import msal
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 from token_cache import TokenCacheStorage
 import one_drive
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+LOG_LEVEL = (os.environ.get('LOG_LEVEL') or 'INFO').strip().upper()
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        format='%(asctime)s %(levelname)s [%(name)s] %(message)s',
+    )
 
 PORT = int(os.environ.get("PORT", 8080))
 CLIENT_ID = (os.environ.get("CLIENT_ID") or os.getenv("ADDON_CLIENT_ID") or "").strip()
@@ -79,6 +88,36 @@ class StateStore:
 
 def now_local():
     return datetime.now(APP_TZ)
+
+
+def _format_dt(dt):
+    if not dt:
+        return None
+    try:
+        return dt.astimezone(APP_TZ).isoformat()
+    except Exception:
+        return str(dt)
+
+
+def _scheduler_event_listener(event):
+    job_id = getattr(event, 'job_id', None)
+    scheduled_run = _format_dt(getattr(event, 'scheduled_run_time', None))
+
+    if event.code == EVENT_JOB_SUBMITTED:
+        _LOGGER.info('Scheduler submitted job=%s scheduled=%s', job_id, scheduled_run)
+        return
+
+    if event.code == EVENT_JOB_MISSED:
+        _LOGGER.warning('Scheduler MISSED job=%s scheduled=%s', job_id, scheduled_run)
+        return
+
+    if event.code == EVENT_JOB_ERROR:
+        _LOGGER.error('Scheduler job error job=%s scheduled=%s', job_id, scheduled_run, exc_info=getattr(event, 'exception', None))
+        return
+
+    if event.code == EVENT_JOB_EXECUTED:
+        _LOGGER.info('Scheduler executed job=%s scheduled=%s', job_id, scheduled_run)
+        return
 
 
 def now_utc_iso():
@@ -276,8 +315,12 @@ def schedule_jobs(app):
     # Bind scheduler to the currently running aiohttp loop.
     scheduler = AsyncIOScheduler(event_loop=asyncio.get_running_loop(), timezone=APP_TZ)
     scheduler.start()
+    scheduler.add_listener(
+        _scheduler_event_listener,
+        EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED | EVENT_JOB_SUBMITTED,
+    )
     app['scheduler'] = scheduler
-    _LOGGER.info('Scheduler started with timezone: %s', APP_TZ_NAME)
+    _LOGGER.info('Scheduler started with timezone=%s log_level=%s', APP_TZ_NAME, LOG_LEVEL)
     sync_task_schedules(app)
 
 
@@ -336,6 +379,14 @@ def sync_task_schedules(app):
         job = scheduler.get_job(f'task_{task_id}')
         next_run_dt = job.next_run_time if job else None
         task.setdefault('state', {})['next_run_at'] = next_run_dt.isoformat() if next_run_dt else None
+        _LOGGER.info(
+            'Scheduled task id=%s name=%s type=%s time=%s next_run=%s',
+            task_id,
+            task.get('name'),
+            schedule_type,
+            schedule.get('time', '02:00'),
+            _format_dt(next_run_dt),
+        )
 
     save_state(app)
 
@@ -740,6 +791,8 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
     else:
         jobs[job_id]['status'] = 'running'
 
+    _LOGGER.info('Starting backup job id=%s task_id=%s trigger=%s', job_id, task_id, trigger)
+
     try:
         token = acquire_token_silent(app)
         if not token:
@@ -791,6 +844,7 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
         task_state['next_run_at'] = compute_next_run(task) if task.get('enabled', True) else None
         task['updated_at'] = now_utc_iso()
         save_state(app)
+        _LOGGER.info('Backup job completed id=%s task_id=%s status=%s summary=%s', job_id, task_id, jobs[job_id]['status'], summary)
 
     except Exception as ex:
         jobs[job_id]['status'] = 'error'
@@ -802,6 +856,7 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
         task_state['next_run_at'] = compute_next_run(task) if task.get('enabled', True) else None
         task['updated_at'] = now_utc_iso()
         save_state(app)
+        _LOGGER.exception('Backup job failed id=%s task_id=%s', job_id, task_id)
 
     finally:
         jobs[job_id]['completed_at'] = now_utc_iso()
@@ -855,6 +910,43 @@ async def list_jobs(request):
     jobs = list((request.app.get('jobs') or {}).values())
     jobs.sort(key=lambda j: j.get('started_at') or '', reverse=True)
     return web.json_response({'jobs': jobs[:100]})
+
+
+async def debug_scheduler(request):
+    scheduler = request.app.get('scheduler')
+    out_jobs = []
+    if scheduler:
+        for job in scheduler.get_jobs():
+            out_jobs.append(
+                {
+                    'id': job.id,
+                    'next_run_time': _format_dt(job.next_run_time),
+                    'trigger': str(job.trigger),
+                }
+            )
+
+    state = get_state(request.app)
+    task_views = []
+    for task in state.get('tasks') or []:
+        task_views.append(
+            {
+                'id': task.get('id'),
+                'name': task.get('name'),
+                'enabled': bool(task.get('enabled', True)),
+                'schedule': task.get('schedule'),
+                'state': task.get('state') or {},
+            }
+        )
+
+    return web.json_response(
+        {
+            'timezone': APP_TZ_NAME,
+            'now_local': now_local().isoformat(),
+            'scheduler_running': bool(scheduler and scheduler.running),
+            'jobs': out_jobs,
+            'tasks': task_views,
+        }
+    )
 
 
 async def trigger_backup(request):
@@ -940,6 +1032,7 @@ def create_app():
     app.router.add_get('/api/jobs', list_jobs)
     app.router.add_get('/api/jobs/{job_id}', get_job)
     app.router.add_get('/api/onedrive/tree', onedrive_tree)
+    app.router.add_get('/api/debug/scheduler', debug_scheduler)
 
     app.router.add_post('/api/backup', trigger_backup)
     app.router.add_get('/api/list', list_backups)

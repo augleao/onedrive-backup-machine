@@ -323,10 +323,16 @@ def _auth_result_payload(auth_state):
     if verification_uri and 'login.microsoft.com/device' in verification_uri:
         verification_uri = 'https://microsoft.com/devicelogin'
 
+    verification_uri_complete = auth_state.get('verification_uri_complete')
+    if verification_uri_complete and 'login.microsoft.com/device' in verification_uri_complete:
+        # Keep full URL behavior but normalize host variant.
+        verification_uri_complete = verification_uri_complete.replace('login.microsoft.com/device', 'microsoft.com/devicelogin')
+
     return {
         'status': auth_state.get('status', 'idle'),
         'message': auth_state.get('message'),
         'verification_uri': verification_uri,
+        'verification_uri_complete': verification_uri_complete,
         'user_code': auth_state.get('user_code'),
         'expires_in': auth_state.get('expires_in'),
     }
@@ -376,6 +382,7 @@ async def device_login_start(request):
         'status': 'pending',
         'message': flow.get('message'),
         'verification_uri': flow.get('verification_uri'),
+        'verification_uri_complete': flow.get('verification_uri_complete'),
         'user_code': flow.get('user_code'),
         'expires_in': flow.get('expires_in'),
         'flow': flow,

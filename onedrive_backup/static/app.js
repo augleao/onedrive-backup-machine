@@ -36,6 +36,10 @@ function setLoginEnabled(enabled) {
   qs('login').disabled = !enabled;
 }
 
+function getDeviceLoginUrl(authPayload) {
+  return authPayload.verification_uri_complete || authPayload.verification_uri || 'https://microsoft.com/devicelogin';
+}
+
 function openAddonConfiguration() {
   const candidates = [
     '/hassio/addon/onedrive_backup_machine/configuration',
@@ -285,8 +289,9 @@ async function authStatusPoll() {
   const msg = qs('auth_message');
   if (j.verification_uri && j.user_code) {
     box.style.display = 'block';
-    qs('auth_url').href = j.verification_uri;
-    qs('auth_url').innerText = j.verification_uri;
+    const loginUrl = getDeviceLoginUrl(j);
+    qs('auth_url').href = loginUrl;
+    qs('auth_url').innerText = loginUrl;
     qs('auth_code').innerText = j.user_code;
   }
 
@@ -324,8 +329,9 @@ async function startLogin() {
 
   qs('authbox').style.display = 'block';
   if (j.verification_uri && j.user_code) {
-    qs('auth_url').href = j.verification_uri;
-    qs('auth_url').innerText = j.verification_uri;
+    const loginUrl = getDeviceLoginUrl(j);
+    qs('auth_url').href = loginUrl;
+    qs('auth_url').innerText = loginUrl;
     qs('auth_code').innerText = j.user_code;
   }
   qs('auth_message').innerText = j.message || 'Waiting for login completion...';

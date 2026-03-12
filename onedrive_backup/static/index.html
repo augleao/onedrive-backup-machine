@@ -300,12 +300,60 @@
         color: var(--warn);
       }
 
+      .support-fab {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 60;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid #c78310;
+        background: linear-gradient(135deg, #ffdd57, #ffb82e);
+        color: #2f1b00;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow: 0 10px 26px rgba(95, 66, 5, 0.32);
+        animation: support-pulse 1.8s ease-in-out infinite;
+      }
+
+      .support-fab:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(95, 66, 5, 0.4);
+      }
+
+      .support-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.74);
+        font-size: 18px;
+      }
+
+      @keyframes support-pulse {
+        0%,
+        100% { transform: scale(1); }
+        50% { transform: scale(1.04); }
+      }
+
       @media (max-width: 700px) {
         th:nth-child(4),
         td:nth-child(4),
         th:nth-child(5),
         td:nth-child(5) {
           display: none;
+        }
+
+        .support-fab {
+          right: 12px;
+          bottom: 12px;
+          padding: 10px 12px;
+          font-size: 13px;
         }
       }
     </style>
@@ -518,6 +566,11 @@
         </div>
       </div>
     </div>
+
+    <a class="support-fab" href="https://buymeacoffee.com/augleao" target="_blank" rel="noopener noreferrer" aria-label="Buy Me a Coffee">
+      <span class="support-icon">☕</span>
+      <span>Buy Me a Coffee</span>
+    </a>
 
     <script src="static/app.js?v=0.3.14"></script>
   </body>

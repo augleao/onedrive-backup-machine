@@ -112,7 +112,12 @@ def _scheduler_event_listener(event):
         return
 
     if event.code == EVENT_JOB_ERROR:
-        _LOGGER.error('Scheduler job error job=%s scheduled=%s', job_id, scheduled_run, exc_info=getattr(event, 'exception', None))
+        _LOGGER.error(
+            'Scheduler job error job=%s scheduled=%s exception=%s',
+            job_id,
+            scheduled_run,
+            getattr(event, 'exception', None),
+        )
         return
 
     if event.code == EVENT_JOB_EXECUTED:
@@ -363,13 +368,12 @@ def sync_task_schedules(app):
 
         task_id = task['id']
 
-        def _runner(tid=task_id):
-            asyncio.create_task(run_task_by_id(app, tid, trigger='scheduled'))
-
         scheduler.add_job(
-            _runner,
+            run_task_by_id,
             trigger='cron',
             id=f'task_{task_id}',
+            args=[app, task_id],
+            kwargs={'trigger': 'scheduled'},
             replace_existing=True,
             misfire_grace_time=3600,
             coalesce=True,
@@ -841,7 +845,12 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
             task_state['incremental_count'] = 0
 
         task_state['last_run_at'] = now_utc_iso()
-        task_state['next_run_at'] = compute_next_run(task) if task.get('enabled', True) else None
+        if task.get('enabled', True):
+            sched_job = app.get('scheduler').get_job(f'task_{task_id}') if app.get('scheduler') else None
+            next_dt = sched_job.next_run_time if sched_job else None
+            task_state['next_run_at'] = next_dt.isoformat() if next_dt else compute_next_run(task)
+        else:
+            task_state['next_run_at'] = None
         task['updated_at'] = now_utc_iso()
         save_state(app)
         _LOGGER.info('Backup job completed id=%s task_id=%s status=%s summary=%s', job_id, task_id, jobs[job_id]['status'], summary)
@@ -853,7 +862,12 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
         task_state = task.setdefault('state', {})
         task_state['last_status'] = 'error'
         task_state['last_run_at'] = now_utc_iso()
-        task_state['next_run_at'] = compute_next_run(task) if task.get('enabled', True) else None
+        if task.get('enabled', True):
+            sched_job = app.get('scheduler').get_job(f'task_{task_id}') if app.get('scheduler') else None
+            next_dt = sched_job.next_run_time if sched_job else None
+            task_state['next_run_at'] = next_dt.isoformat() if next_dt else compute_next_run(task)
+        else:
+            task_state['next_run_at'] = None
         task['updated_at'] = now_utc_iso()
         save_state(app)
         _LOGGER.exception('Backup job failed id=%s task_id=%s', job_id, task_id)

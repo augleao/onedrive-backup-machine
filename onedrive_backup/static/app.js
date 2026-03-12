@@ -10,6 +10,8 @@ const state = {
   treeCurrent: { id: null, path: '/' },
 };
 
+let lastSchedulerDebugSignature = null;
+
 function qs(id) {
   return document.getElementById(id);
 }
@@ -443,6 +445,38 @@ async function loadJobs() {
   }
 }
 
+async function logSchedulerDebug() {
+  try {
+    const r = await fetch('api/debug/scheduler');
+    const j = await readJsonOrThrow(r);
+    const jobs = j.jobs || [];
+    const signature = JSON.stringify({
+      running: j.scheduler_running,
+      timezone: j.timezone,
+      jobs: jobs.map((x) => ({ id: x.id, next: x.next_run_time })),
+    });
+
+    if (signature !== lastSchedulerDebugSignature) {
+      console.log('[Scheduler Debug]', {
+        timezone: j.timezone,
+        now_local: j.now_local,
+        scheduler_running: j.scheduler_running,
+        jobs,
+      });
+      lastSchedulerDebugSignature = signature;
+    }
+
+    if (!j.scheduler_running) {
+      console.warn('[Scheduler Debug] Scheduler is not running.');
+    }
+    if (!jobs.length) {
+      console.warn('[Scheduler Debug] No scheduled jobs loaded.');
+    }
+  } catch (e) {
+    console.error('[Scheduler Debug] Failed to read scheduler status:', e.message);
+  }
+}
+
 function renderTree(items) {
   const container = qs('tree_container');
   container.innerHTML = '';
@@ -650,7 +684,9 @@ function bindEvents() {
 async function init() {
   bindEvents();
   await Promise.all([loadStatus(), loadSettings(), loadTasks(), loadJobs()]);
+  await logSchedulerDebug();
   setInterval(loadJobs, 5000);
+  setInterval(logSchedulerDebug, 15000);
 }
 
 init();

@@ -36,6 +36,35 @@ function setLoginEnabled(enabled) {
   qs('login').disabled = !enabled;
 }
 
+function setAccountActionVisibility({ authenticated, clientConfigured }) {
+  const loginBtn = qs('login');
+  const logoutBtn = qs('logout');
+  const addonConfigBtn = qs('addon_config_btn');
+  const azurePortalBtn = qs('azure_portal_btn');
+  const azureDocsBtn = qs('azure_docs_btn');
+
+  if (authenticated) {
+    // When account is linked, keep only Disconnect visible.
+    loginBtn.style.display = 'none';
+    addonConfigBtn.style.display = 'none';
+    azurePortalBtn.style.display = 'none';
+    azureDocsBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    return;
+  }
+
+  // When account is not linked, hide Disconnect and show setup actions.
+  logoutBtn.style.display = 'none';
+  loginBtn.style.display = 'inline-block';
+  addonConfigBtn.style.display = 'inline-block';
+  azurePortalBtn.style.display = 'inline-block';
+  azureDocsBtn.style.display = 'inline-block';
+
+  if (!clientConfigured) {
+    loginBtn.style.display = 'none';
+  }
+}
+
 function getDeviceLoginUrl(authPayload) {
   return authPayload.verification_uri_complete || authPayload.verification_uri || 'https://microsoft.com/devicelogin';
 }
@@ -261,16 +290,22 @@ async function loadStatus() {
     if (!j.client_id_configured) {
       setStatus('Set client_id in add-on configuration');
       setLoginEnabled(false);
+      setAccountActionVisibility({ authenticated: false, clientConfigured: false });
       qs('client_id_help').style.display = 'block';
       qs('authbox').style.display = 'block';
       qs('auth_message').innerText = 'Configure client_id first. Use the Azure button above.';
       return;
     }
     setLoginEnabled(true);
+    setAccountActionVisibility({ authenticated: !!j.authenticated, clientConfigured: true });
     qs('client_id_help').style.display = 'none';
+    if (j.authenticated) {
+      qs('authbox').style.display = 'none';
+    }
     setStatus(j.authenticated ? 'Account linked' : 'Account not linked');
   } catch (e) {
     setLoginEnabled(false);
+    setAccountActionVisibility({ authenticated: false, clientConfigured: false });
     setStatus(`Error: ${e.message}`);
   }
 }

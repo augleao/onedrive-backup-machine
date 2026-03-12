@@ -260,14 +260,31 @@ async def api_error_middleware(request, handler):
 
 
 def schedule_jobs(app):
-    scheduler = AsyncIOScheduler()
+    # Bind scheduler to the currently running aiohttp loop.
+    scheduler = AsyncIOScheduler(event_loop=asyncio.get_running_loop())
     scheduler.start()
     app['scheduler'] = scheduler
     sync_task_schedules(app)
 
 
+async def on_startup(app):
+    schedule_jobs(app)
+
+
+async def on_cleanup(app):
+    scheduler = app.get('scheduler')
+    if not scheduler:
+        return
+    try:
+        scheduler.shutdown(wait=False)
+    except Exception:
+        _LOGGER.exception('Failed to shutdown scheduler cleanly')
+
+
 def sync_task_schedules(app):
-    scheduler = app['scheduler']
+    scheduler = app.get('scheduler')
+    if not scheduler:
+        return
     for job in scheduler.get_jobs():
         if job.id.startswith('task_'):
             scheduler.remove_job(job.id)
@@ -903,7 +920,8 @@ def create_app():
     app.router.add_post('/api/backup', trigger_backup)
     app.router.add_get('/api/list', list_backups)
 
-    schedule_jobs(app)
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
     return app
 
 

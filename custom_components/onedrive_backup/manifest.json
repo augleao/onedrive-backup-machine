@@ -1,0 +1,11 @@
+{
+  "domain": "onedrive_backup",
+  "name": "OneDrive Backup",
+  "version": "0.1.1",
+  "documentation": "https://github.com/augleao/onedrive-backup-machine",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@augleao"],
+  "homeassistant": "2021.6.0",
+  "iot_class": "local_polling"
+}

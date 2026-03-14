@@ -2,6 +2,51 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: "Trebuchet MS", "Lucida Sans Unicode", sans-serif;
+        margin: 16px;
+      }
+
+      .support-fab {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        z-index: 60;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid #c78310;
+        background: linear-gradient(135deg, #ffdd57, #ffb82e);
+        color: #2f1b00;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow: 0 10px 26px rgba(95, 66, 5, 0.32);
+      }
+
+      .support-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.74);
+        font-size: 18px;
+      }
+
+      @media (max-width: 700px) {
+        .support-fab {
+          right: 12px;
+          top: 12px;
+          padding: 10px 12px;
+          font-size: 13px;
+        }
+      }
+    </style>
   </head>
   <body>
     <title>Onedrive Backup Machine</title>
@@ -9,7 +54,10 @@
     <div id="status">Checking...</div>
     <button id="login">Login to OneDrive</button>
     <button id="backup">Trigger Backup</button>
-    <p><a href="https://buymeacoffee.com/augleao" target="_blank" rel="noopener noreferrer">Buy Me a Coffee</a></p>
+    <a class="support-fab" href="https://buymeacoffee.com/augleao" target="_blank" rel="noopener noreferrer" aria-label="Buy Me a Coffee">
+      <span class="support-icon">☕</span>
+      <span>Buy Me a Coffee</span>
+    </a>
     <script src="/static/app.js"></script>
   </body>
 </html>

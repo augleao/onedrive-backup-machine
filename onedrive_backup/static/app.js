@@ -8,6 +8,7 @@ const state = {
   selectedSources: new Map(),
   treeStack: [],
   treeCurrent: { id: null, path: '/' },
+  diagnosticsLogLines: 300,
 };
 
 let lastSchedulerDebugSignature = null;
@@ -168,16 +169,122 @@ function renderJobs() {
   state.jobs.forEach((job) => {
     const tr = document.createElement('tr');
     const summary = job.summary || {};
-    const summaryText = `Downloaded: ${summary.downloaded || 0}, Skipped: ${summary.skipped || 0}, Errors: ${summary.errors || 0}`;
+    const errors = summary.errors || 0;
     tr.innerHTML = `
       <td>${job.task_name || job.task_id || '-'}</td>
       <td><span class="job-status job-${job.status || 'queued'}">${job.status || 'queued'}</span></td>
       <td>${job.mode || '-'}</td>
       <td>${formatDate(job.started_at)}</td>
-      <td>${summaryText}</td>
+      <td>
+        Downloaded: ${summary.downloaded || 0},
+        Skipped: ${summary.skipped || 0},
+        <button class="linkish errors-link" data-job-id="${job.id}" data-errors="${errors}" ${errors > 0 ? '' : 'disabled'}>
+          Errors: ${errors}
+        </button>
+      </td>
     `;
+
+    const errorsBtn = tr.querySelector('.errors-link');
+    if (errorsBtn) {
+      errorsBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (errors < 1) {
+          return;
+        }
+        await openJobDiagnostics(job.id);
+      });
+    }
+
     tbody.appendChild(tr);
   });
+}
+
+function setDiagnosticsVisibility(show) {
+  const modal = qs('diagnostics_modal');
+  if (!modal) {
+    return;
+  }
+  modal.style.display = show ? 'flex' : 'none';
+}
+
+function renderDiagnosticsErrorMessages(messages) {
+  const list = qs('diagnostics_errors');
+  if (!list) {
+    return;
+  }
+  list.innerHTML = '';
+  if (!messages.length) {
+    const li = document.createElement('li');
+    li.className = 'muted';
+    li.textContent = 'No error messages registered in this job.';
+    list.appendChild(li);
+    return;
+  }
+
+  messages.forEach((msg) => {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    list.appendChild(li);
+  });
+}
+
+async function loadDiagnosticsLogs() {
+  const logPath = qs('diagnostics_log_path');
+  const logContent = qs('diagnostics_log_content');
+  if (!logContent || !logPath) {
+    return;
+  }
+
+  logPath.textContent = 'Loading logs...';
+  logContent.textContent = 'Loading...';
+
+  try {
+    const r = await fetch(`api/logs?lines=${state.diagnosticsLogLines}`);
+    const j = await readJsonOrThrow(r);
+    if (!j.available) {
+      const reason = j.reason || 'unknown';
+      logPath.textContent = `Logs unavailable (${reason})`;
+      logContent.textContent = 'No logs available for now.';
+      return;
+    }
+
+    logPath.textContent = j.path || '-';
+    const lines = j.lines || [];
+    logContent.textContent = lines.length ? lines.join('\n') : 'Log file is empty.';
+    logContent.scrollTop = logContent.scrollHeight;
+  } catch (e) {
+    logPath.textContent = 'Failed to load logs';
+    logContent.textContent = `Error while loading logs: ${e.message}`;
+  }
+}
+
+async function openJobDiagnostics(jobId) {
+  let job = state.jobs.find((j) => j.id === jobId) || null;
+  try {
+    const r = await fetch(`api/jobs/${encodeURIComponent(jobId)}`);
+    job = await readJsonOrThrow(r);
+  } catch (e) {
+    console.warn('Failed to refresh job details for diagnostics:', e.message);
+  }
+
+  if (!job) {
+    alert('Could not load job details.');
+    return;
+  }
+
+  qs('diagnostics_job_title').innerText = `Job Diagnostics - ${job.task_name || job.task_id || job.id}`;
+  qs('diagnostics_job_meta').innerText = `Status: ${job.status || '-'} | Mode: ${job.mode || '-'} | Started: ${formatDate(job.started_at)}`;
+
+  const summary = job.summary || {};
+  qs('diagnostics_job_summary').innerText = `Downloaded: ${summary.downloaded || 0} | Skipped: ${summary.skipped || 0} | Errors: ${summary.errors || 0}`;
+  renderDiagnosticsErrorMessages(summary.error_messages || []);
+
+  setDiagnosticsVisibility(true);
+  await loadDiagnosticsLogs();
+}
+
+function closeDiagnostics() {
+  setDiagnosticsVisibility(false);
 }
 
 function updateModeFields() {
@@ -644,6 +751,14 @@ function bindEvents() {
   qs('delete_task').addEventListener('click', deleteSelectedTask);
   qs('run_task').addEventListener('click', runSelectedTask);
   qs('refresh_jobs').addEventListener('click', loadJobs);
+
+  qs('diagnostics_close').addEventListener('click', closeDiagnostics);
+  qs('diagnostics_refresh_logs').addEventListener('click', loadDiagnosticsLogs);
+  qs('diagnostics_modal').addEventListener('click', (event) => {
+    if (event.target && event.target.id === 'diagnostics_modal') {
+      closeDiagnostics();
+    }
+  });
 
   qs('backup_mode').addEventListener('change', updateModeFields);
   qs('schedule_type').addEventListener('change', updateScheduleFields);

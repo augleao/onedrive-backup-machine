@@ -296,8 +296,87 @@
         font-size: 12px;
       }
 
+      .linkish {
+        border: none;
+        background: transparent;
+        padding: 0;
+        margin: 0;
+        color: var(--danger);
+        font-weight: 700;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+      .linkish[disabled] {
+        color: var(--muted);
+        text-decoration: none;
+        cursor: default;
+      }
+
       .warn {
         color: var(--warn);
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 18, 8, 0.58);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        z-index: 70;
+      }
+
+      .modal {
+        width: min(920px, 100%);
+        max-height: 92vh;
+        overflow: auto;
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        box-shadow: 0 14px 44px rgba(14, 26, 12, 0.24);
+      }
+
+      .modal-head,
+      .modal-actions {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .modal-actions {
+        border-bottom: none;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .modal-body {
+        padding: 14px;
+      }
+
+      .diag-list {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      .diag-list li {
+        margin-bottom: 6px;
+      }
+
+      .log-box {
+        margin-top: 8px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #f7faf5;
+        padding: 10px;
+        max-height: 320px;
+        overflow: auto;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .support-fab {
@@ -567,11 +646,36 @@
       </div>
     </div>
 
+    <div id="diagnostics_modal" class="modal-backdrop">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="diagnostics_job_title">Job Diagnostics</h3>
+          <p id="diagnostics_job_meta" class="small muted" style="margin-top: 8px;"></p>
+          <p id="diagnostics_job_summary" class="small" style="margin-top: 6px;"></p>
+        </div>
+        <div class="modal-body">
+          <h4 style="margin: 0 0 6px;">Error Messages</h4>
+          <ul id="diagnostics_errors" class="diag-list"></ul>
+
+          <h4 style="margin: 14px 0 6px;">Application Logs</h4>
+          <p class="small muted">File: <span id="diagnostics_log_path">-</span></p>
+          <div id="diagnostics_log_content" class="log-box">No logs loaded yet.</div>
+        </div>
+        <div class="modal-actions">
+          <span class="small muted">Tip: click outside this panel to close.</span>
+          <div class="row" style="margin: 0;">
+            <button id="diagnostics_refresh_logs">Refresh logs</button>
+            <button id="diagnostics_close" class="primary">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <a class="support-fab" href="https://buymeacoffee.com/augleao" target="_blank" rel="noopener noreferrer" aria-label="Buy Me a Coffee">
       <span class="support-icon">☕</span>
       <span>Buy Me a Coffee</span>
     </a>
 
-    <script src="static/app.js?v=0.3.14"></script>
+    <script src="static/app.js?v=0.3.21"></script>
   </body>
 </html>

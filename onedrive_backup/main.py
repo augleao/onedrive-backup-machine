@@ -203,6 +203,11 @@ def to_safe_folder_name(value):
     return safe or 'task'
 
 
+def build_run_folder_name(mode, run_dt):
+    # Keep folder names filesystem-safe and easy to identify by users.
+    return f"{mode}_{run_dt.strftime('%d_%m_%Y_%H_%M_%S')}"
+
+
 def parse_hhmm(value):
     if not isinstance(value, str) or ':' not in value:
         raise ValueError('time must be HH:MM')
@@ -906,15 +911,20 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
 
         destination_root = task.get('destination_path') or BACKUP_PATH
         task_folder = to_safe_folder_name(task.get('name') or task_id)
-        task_root = os.path.join(destination_root, task_folder)
-        mirror_root = os.path.join(task_root, '_latest')
-        run_stamp = now_local().strftime('%Y%m%d_%H%M%S')
-        run_root = os.path.join(task_root, f'{effective_mode}_{run_stamp}')
+        run_dt = now_local()
+        run_folder_name = build_run_folder_name(effective_mode, run_dt)
+
+        # Keep a hidden latest mirror per task for incremental diffing.
+        mirror_root = os.path.join(destination_root, '.latest', task_folder)
+        run_root = os.path.join(destination_root, run_folder_name)
+        if os.path.exists(run_root):
+            run_root = os.path.join(destination_root, f'{run_folder_name}_{task_folder}')
+
         os.makedirs(mirror_root, exist_ok=True)
         os.makedirs(run_root, exist_ok=True)
 
         jobs[job_id]['destination_root'] = destination_root
-        jobs[job_id]['task_root'] = task_root
+        jobs[job_id]['task_root'] = os.path.join(destination_root, '.latest', task_folder)
         jobs[job_id]['run_path'] = run_root
 
         summary = jobs[job_id]['summary']

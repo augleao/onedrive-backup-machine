@@ -162,7 +162,7 @@ function renderJobs() {
   const tbody = qs('jobs_tbody');
   tbody.innerHTML = '';
   if (!state.jobs.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="muted">No jobs yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">No jobs yet.</td></tr>';
     return;
   }
 
@@ -170,6 +170,8 @@ function renderJobs() {
     const tr = document.createElement('tr');
     const summary = job.summary || {};
     const errors = summary.errors || 0;
+    const status = (job.status || 'queued').toLowerCase();
+    const canCancel = status === 'running' || status === 'queued';
     tr.innerHTML = `
       <td>${job.task_name || job.task_id || '-'}</td>
       <td><span class="job-status job-${job.status || 'queued'}">${job.status || 'queued'}</span></td>
@@ -181,6 +183,9 @@ function renderJobs() {
         <button class="linkish errors-link" data-job-id="${job.id}" data-errors="${errors}" ${errors > 0 ? '' : 'disabled'}>
           Errors: ${errors}
         </button>
+      </td>
+      <td>
+        ${canCancel ? `<button class="danger small cancel-job-btn" data-job-id="${job.id}">Cancel</button>` : '<span class="muted">-</span>'}
       </td>
     `;
 
@@ -195,8 +200,35 @@ function renderJobs() {
       });
     }
 
+    const cancelBtn = tr.querySelector('.cancel-job-btn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await cancelJob(job.id, job.task_name || job.task_id || job.id);
+      });
+    }
+
     tbody.appendChild(tr);
   });
+}
+
+async function cancelJob(jobId, label) {
+  if (!window.confirm(`Cancel running job for "${label}"?`)) {
+    return;
+  }
+
+  try {
+    const r = await fetch(`api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+    const j = await readJsonOrThrow(r);
+    if (j.canceled) {
+      await loadJobs();
+      await loadTasks();
+      return;
+    }
+    alert('Job could not be canceled.');
+  } catch (e) {
+    alert('Failed to cancel job: ' + e.message);
+  }
 }
 
 function setDiagnosticsVisibility(show) {

@@ -195,6 +195,19 @@ def now_utc_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+class JobCancelledError(Exception):
+    """Raised when a backup job was cancelled by user request."""
+
+
+def is_job_cancel_requested(app, job_id):
+    return job_id in (app.get('job_cancel_requests') or set())
+
+
+def ensure_job_not_cancelled(app, job_id):
+    if is_job_cancel_requested(app, job_id):
+        raise JobCancelledError('job_cancelled_by_user')
+
+
 def to_safe_folder_name(value):
     text = (value or '').strip()
     if not text:
@@ -810,7 +823,8 @@ async def delete_task(request):
     return web.json_response({'deleted': True})
 
 
-async def sync_file_item(access_token, item, destination_root, rel_path, mode, summary, reference_root=None, archive_root=None):
+async def sync_file_item(app, job_id, access_token, item, destination_root, rel_path, mode, summary, reference_root=None, archive_root=None):
+    ensure_job_not_cancelled(app, job_id)
     source_name = item.get('name') or item.get('id') or 'unknown'
     dest_path = os.path.join(destination_root, rel_path)
     os.makedirs(os.path.dirname(dest_path) or '.', exist_ok=True)
@@ -825,6 +839,7 @@ async def sync_file_item(access_token, item, destination_root, rel_path, mode, s
             return
 
     await one_drive.download_item(access_token, item.get('id'), dest_path, overwrite=True)
+    ensure_job_not_cancelled(app, job_id)
     if archive_root:
         archive_path = os.path.join(archive_root, rel_path)
         os.makedirs(os.path.dirname(archive_path) or '.', exist_ok=True)
@@ -833,31 +848,34 @@ async def sync_file_item(access_token, item, destination_root, rel_path, mode, s
     _LOGGER.info('Downloaded file=%s rel_path=%s destination=%s', source_name, rel_path, dest_path)
 
 
-async def sync_folder(access_token, folder_id, rel_root, destination_root, mode, summary, reference_root=None, archive_root=None):
+async def sync_folder(app, job_id, access_token, folder_id, rel_root, destination_root, mode, summary, reference_root=None, archive_root=None):
+    ensure_job_not_cancelled(app, job_id)
     children = await one_drive.list_children(access_token, parent_id=folder_id)
     _LOGGER.info('Syncing folder rel_root=%s children=%s mode=%s', rel_root, len(children), mode)
     for child in children:
+        ensure_job_not_cancelled(app, job_id)
         child_name = child.get('name') or child.get('id')
         child_rel = f"{rel_root}/{child_name}" if rel_root else child_name
         if 'folder' in child:
             os.makedirs(os.path.join(destination_root, child_rel), exist_ok=True)
             if archive_root:
                 os.makedirs(os.path.join(archive_root, child_rel), exist_ok=True)
-            await sync_folder(access_token, child.get('id'), child_rel, destination_root, mode, summary, reference_root=reference_root, archive_root=archive_root)
+            await sync_folder(app, job_id, access_token, child.get('id'), child_rel, destination_root, mode, summary, reference_root=reference_root, archive_root=archive_root)
         elif 'file' in child:
-            await sync_file_item(access_token, child, destination_root, child_rel, mode, summary, reference_root=reference_root, archive_root=archive_root)
+            await sync_file_item(app, job_id, access_token, child, destination_root, child_rel, mode, summary, reference_root=reference_root, archive_root=archive_root)
 
 
-async def sync_source(access_token, source, destination_root, mode, summary, reference_root=None, archive_root=None):
+async def sync_source(app, job_id, access_token, source, destination_root, mode, summary, reference_root=None, archive_root=None):
+    ensure_job_not_cancelled(app, job_id)
     rel_path = (source.get('path') or source.get('name') or source.get('id') or 'item').strip('/').strip()
     _LOGGER.info('Syncing source id=%s name=%s rel_path=%s is_folder=%s mode=%s', source.get('id'), source.get('name'), rel_path, bool(source.get('is_folder')), mode)
     if source.get('is_folder'):
         os.makedirs(os.path.join(destination_root, rel_path), exist_ok=True)
         if archive_root:
             os.makedirs(os.path.join(archive_root, rel_path), exist_ok=True)
-        await sync_folder(access_token, source.get('id'), rel_path, destination_root, mode, summary, reference_root=reference_root, archive_root=archive_root)
+        await sync_folder(app, job_id, access_token, source.get('id'), rel_path, destination_root, mode, summary, reference_root=reference_root, archive_root=archive_root)
     else:
-        await sync_file_item(access_token, source, destination_root, rel_path, mode, summary, reference_root=reference_root, archive_root=archive_root)
+        await sync_file_item(app, job_id, access_token, source, destination_root, rel_path, mode, summary, reference_root=reference_root, archive_root=archive_root)
 
 
 async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
@@ -891,6 +909,7 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
     _LOGGER.info('Starting backup job id=%s task_id=%s task_name=%s trigger=%s', job_id, task_id, task.get('name'), trigger)
 
     try:
+        ensure_job_not_cancelled(app, job_id)
         token = acquire_token_silent(app)
         if not token:
             raise ValueError('not_authenticated')
@@ -932,7 +951,10 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
 
         for source in task.get('sources') or []:
             try:
-                await sync_source(access_token, source, mirror_root, effective_mode, summary, reference_root=mirror_root, archive_root=run_root)
+                ensure_job_not_cancelled(app, job_id)
+                await sync_source(app, job_id, access_token, source, mirror_root, effective_mode, summary, reference_root=mirror_root, archive_root=run_root)
+            except JobCancelledError:
+                raise
             except Exception as source_ex:
                 summary['errors'] += 1
                 source_desc = source.get('path') or source.get('name') or source.get('id') or 'unknown'
@@ -969,6 +991,22 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
         save_state(app)
         _LOGGER.info('Backup job completed id=%s task_id=%s status=%s summary=%s', job_id, task_id, jobs[job_id]['status'], summary)
 
+    except JobCancelledError:
+        jobs[job_id]['status'] = 'canceled'
+        jobs[job_id]['summary']['error_messages'].append('Job canceled by user request.')
+        task_state = task.setdefault('state', {})
+        task_state['last_status'] = 'canceled'
+        task_state['last_run_at'] = now_utc_iso()
+        if task.get('enabled', True):
+            sched_job = app.get('scheduler').get_job(f'task_{task_id}') if app.get('scheduler') else None
+            next_dt = sched_job.next_run_time if sched_job else None
+            task_state['next_run_at'] = next_dt.isoformat() if next_dt else compute_next_run(task)
+        else:
+            task_state['next_run_at'] = None
+        task['updated_at'] = now_utc_iso()
+        save_state(app)
+        _LOGGER.warning('Backup job canceled id=%s task_id=%s task_name=%s', job_id, task_id, task.get('name'))
+
     except Exception as ex:
         jobs[job_id]['status'] = 'error'
         jobs[job_id]['summary']['errors'] += 1
@@ -988,6 +1026,7 @@ async def run_task_by_id(app, task_id, trigger='manual', existing_job_id=None):
 
     finally:
         jobs[job_id]['completed_at'] = now_utc_iso()
+        app.setdefault('job_cancel_requests', set()).discard(job_id)
 
     return jobs[job_id]
 
@@ -1000,6 +1039,7 @@ async def run_task_now(request):
         return web.json_response({'error': 'not_found'}, status=404)
 
     jobs = request.app.setdefault('jobs', {})
+    cancel_requests = request.app.setdefault('job_cancel_requests', set())
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         'id': job_id,
@@ -1019,6 +1059,10 @@ async def run_task_now(request):
     }
 
     async def _runner():
+        if job_id in cancel_requests:
+            jobs[job_id]['status'] = 'canceled'
+            jobs[job_id]['completed_at'] = now_utc_iso()
+            return
         jobs[job_id]['status'] = 'running'
         await run_task_by_id(request.app, task_id, trigger='manual', existing_job_id=job_id)
 
@@ -1032,6 +1076,38 @@ async def get_job(request):
     if not job:
         return web.json_response({'error': 'not_found'}, status=404)
     return web.json_response(job)
+
+
+async def cancel_job(request):
+    job_id = request.match_info.get('job_id')
+    jobs = request.app.setdefault('jobs', {})
+    job = jobs.get(job_id)
+    if not job:
+        return web.json_response({'error': 'not_found'}, status=404)
+
+    status = (job.get('status') or '').lower()
+    terminal_statuses = {'completed', 'completed_with_errors', 'error', 'canceled'}
+    if status in terminal_statuses:
+        return web.json_response(
+            {
+                'canceled': False,
+                'job_id': job_id,
+                'status': status,
+                'message': 'job_already_finished',
+            },
+            status=409,
+        )
+
+    request.app.setdefault('job_cancel_requests', set()).add(job_id)
+    job['cancel_requested_at'] = now_utc_iso()
+
+    if status == 'queued':
+        job['status'] = 'canceled'
+        job['completed_at'] = now_utc_iso()
+        job.setdefault('summary', {}).setdefault('error_messages', []).append('Job canceled before start.')
+
+    _LOGGER.warning('Cancellation requested for backup job id=%s status=%s', job_id, status or 'unknown')
+    return web.json_response({'canceled': True, 'job_id': job_id, 'status': job.get('status')})
 
 
 async def list_jobs(request):
@@ -1099,6 +1175,7 @@ async def trigger_backup(request):
     task_id = tasks[0]['id']
     task_name = tasks[0].get('name')
     jobs = request.app.setdefault('jobs', {})
+    cancel_requests = request.app.setdefault('job_cancel_requests', set())
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         'id': job_id,
@@ -1118,6 +1195,10 @@ async def trigger_backup(request):
     }
 
     async def _runner():
+        if job_id in cancel_requests:
+            jobs[job_id]['status'] = 'canceled'
+            jobs[job_id]['completed_at'] = now_utc_iso()
+            return
         jobs[job_id]['status'] = 'running'
         await run_task_by_id(request.app, task_id, trigger='manual', existing_job_id=job_id)
 
@@ -1153,6 +1234,7 @@ def create_app():
     app['state_store'] = StateStore(STATE_PATH)
     app['state'] = app['state_store'].load()
     app['jobs'] = {}
+    app['job_cancel_requests'] = set()
 
     app.router.add_get('/', index)
 
@@ -1172,6 +1254,7 @@ def create_app():
 
     app.router.add_get('/api/jobs', list_jobs)
     app.router.add_get('/api/jobs/{job_id}', get_job)
+    app.router.add_post('/api/jobs/{job_id}/cancel', cancel_job)
     app.router.add_get('/api/onedrive/tree', onedrive_tree)
     app.router.add_get('/api/debug/scheduler', debug_scheduler)
     app.router.add_get('/api/logs', get_logs)

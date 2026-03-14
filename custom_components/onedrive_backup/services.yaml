@@ -1,0 +1,9 @@
+run_task:
+  name: Run backup task
+  description: Run a backup task immediately.
+  fields:
+    task_id:
+      name: Task ID
+      description: Optional task id to run. If omitted, add-on default run endpoint is used.
+      required: false
+      example: "b6fd8a4e-0956-4a7d-9f9f-e740de0f95d1"

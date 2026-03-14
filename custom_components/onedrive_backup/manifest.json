@@ -1,7 +1,7 @@
 {
   "domain": "onedrive_backup",
   "name": "OneDrive Backup",
-  "version": "0.1.2",
+  "version": "0.2.1",
   "documentation": "https://github.com/augleao/onedrive-backup-machine",
   "requirements": [],
   "dependencies": [],

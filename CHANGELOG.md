@@ -6,6 +6,15 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-03-14
+### Changed
+- Bumped custom component version to `0.2.4`.
+
+## [0.3.24] - 2026-03-14
+### Changed
+- Bumped add-on version to `0.3.24`.
+- Updated frontend asset token to `v=0.3.24`.
+
 ## [0.2.3] - 2026-03-14
 ### Fixed
 - Custom component entities now declare `device_info` so sensors and buttons are properly grouped under the device in the Home Assistant device registry.

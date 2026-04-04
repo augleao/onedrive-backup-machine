@@ -2,10 +2,6 @@
   "name": "OneDrive Backup",
   "content_in_root": false,
   "domains": ["onedrive_backup"],
-  "zip_release": false
-}
-{
-  "name": "OneDrive Backup Machine",
   "homeassistant": "2021.6.0",
   "zip_release": false
 }

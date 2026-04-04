@@ -118,6 +118,16 @@ After restart, add the generated entities to your dashboard using standard cards
 - [onedrive_backup](onedrive_backup)
 - [custom_components/onedrive_backup](custom_components/onedrive_backup)
 
+## Instalação via HACS
+
+Para instalar via HACS (Home Assistant Community Store):
+
+- Abra HACS no seu Home Assistant.
+- Em "Custom repositories" adicione este repositório como tipo "Integration" (ou aguarde a revisão para aparecer no store oficial).
+- Após adicionar, instale a integração e reinicie o Home Assistant.
+
+Observação: este repositório já inclui `hacs.json` e uma licença `LICENSE` para facilitar a publicação.
+
 ## Status
 
 The project is actively evolving. The current direction is focused on a stronger backup UX: better job visibility, clearer storage layout, and easier troubleshooting inside the add-on itself.
